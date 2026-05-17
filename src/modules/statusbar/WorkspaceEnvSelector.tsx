@@ -16,21 +16,33 @@ import { HugeiconsIcon } from "@hugeicons/react";
 
 type Props = {
   /**
-   * Picked env to use as the seed for new `+` tabs. Does NOT close or
-   * re-spawn any existing terminal — every existing tab keeps running in
-   * the env it was opened with.
+   * Picked env. Becomes the seed for new `+` tabs AND the env that AI /
+   * file explorer operate in (fetches the matching home so the file
+   * tree doesn't error with ENOENT under a WSL workspace). Does NOT
+   * close or re-spawn any open terminal tab.
    */
   onSelect: (env: WorkspaceEnv) => void;
+  /**
+   * Workspace of the currently focused terminal tab — shown as the
+   * primary label so the user always sees what the focused terminal is
+   * actually running in (distinct from the AI/explorer default).
+   */
+  activeTerminalWorkspace?: WorkspaceEnv;
 };
 
-export function WorkspaceEnvSelector({ onSelect }: Props) {
+export function WorkspaceEnvSelector({
+  onSelect,
+  activeTerminalWorkspace,
+}: Props) {
   if (!IS_WINDOWS) return null;
 
-  // The label tracks the *ambient* env, which App.tsx syncs to the active
-  // terminal tab's workspace. Picking from the menu only updates the
-  // store's `defaultEnv` (seed for new tabs); it does not retroactively
-  // change tabs that are already running.
-  const env = useWorkspaceEnvStore((s) => s.env);
+  // Two distinct things to surface here:
+  //   - what the focused terminal is running in (the visible label)
+  //   - what new "+" tabs / AI / explorer will use (the "default" badge
+  //     inside the dropdown)
+  // Showing the focused tab as the label keeps the bar honest when the
+  // user is staring at a WSL pwsh prompt — they shouldn't see "Windows"
+  // up there.
   const defaultEnv = useWorkspaceEnvStore((s) => s.defaultEnv);
   const distros = useWorkspaceEnvStore((s) => s.distros);
   const loading = useWorkspaceEnvStore((s) => s.loading);
@@ -43,7 +55,9 @@ export function WorkspaceEnvSelector({ onSelect }: Props) {
     }
   };
 
-  const label = env.kind === "wsl" ? `WSL: ${env.distro}` : "Windows";
+  const labelSource = activeTerminalWorkspace ?? defaultEnv;
+  const label =
+    labelSource.kind === "wsl" ? `WSL: ${labelSource.distro}` : "Windows";
 
   const isCurrentDefault = (candidate: WorkspaceEnv): boolean =>
     candidate.kind === defaultEnv.kind &&
@@ -56,7 +70,7 @@ export function WorkspaceEnvSelector({ onSelect }: Props) {
         <button
           type="button"
           className="flex h-6 shrink-0 items-center gap-1 rounded-sm px-1.5 text-[11px] text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus:outline-none focus-visible:outline-none focus-visible:ring-0 data-[state=open]:bg-accent data-[state=open]:text-foreground"
-          title={`Active terminal: ${label}. Pick to set default for new tabs.`}
+          title={`Active terminal: ${label}. Pick to set the default for new tabs and AI / file explorer.`}
         >
           <HugeiconsIcon
             icon={ServerStack03Icon}
