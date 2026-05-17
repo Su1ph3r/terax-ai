@@ -166,21 +166,13 @@ export default function App() {
       .catch(() => setHome(null));
   }, []);
 
-  // Status-bar workspace selector — picks the env that:
-  //   1. new "+" tabs spawn into (read from `defaultEnv` at click time),
-  //   2. the AI / fs / file explorer operate in (read from `env`),
-  //   3. the explorer's root reflects (we fetch the matching home so the
-  //      file tree doesn't try to load a Windows path under a WSL
-  //      workspace, which produces a malformed UNC + ERROR_INVALID_NAME).
-  //
-  // Existing terminal tabs are intentionally untouched — each tab owns
-  // its workspace and keeps running in the env it was opened with.
-  const switchWorkspace = useCallback(
+  // Apply a workspace env to the world (store + explorer home). Used by
+  // both the selector pick path and the focus-change auto-sync below so
+  // they share the same "fetch home + setEnv + setHome" logic.
+  const applyAmbientEnv = useCallback(
     async (env: WorkspaceEnv) => {
       const normalized = env.kind === "local" ? LOCAL_WORKSPACE : env;
-      // No-op if it's already the default — avoids a needless home fetch
-      // and the alert-on-dirty-editor flow below.
-      const current = useWorkspaceEnvStore.getState().defaultEnv;
+      const current = useWorkspaceEnvStore.getState().env;
       const same =
         current.kind === normalized.kind &&
         (current.kind === "local" ||
@@ -190,22 +182,43 @@ export default function App() {
 
       let nextHome: string | null = null;
       try {
-        if (normalized.kind === "wsl") {
-          nextHome = await getWslHome(normalized.distro);
-        } else {
-          nextHome = (await homeDir()).replace(/\\/g, "/");
-        }
+        nextHome =
+          normalized.kind === "wsl"
+            ? await getWslHome(normalized.distro)
+            : (await homeDir()).replace(/\\/g, "/");
       } catch (e) {
         window.alert(String(e));
         return;
       }
-
-      setDefaultWorkspaceEnv(normalized);
       setWorkspaceEnv(normalized);
       setHome(nextHome);
     },
-    [setDefaultWorkspaceEnv, setWorkspaceEnv],
+    [setWorkspaceEnv],
   );
+
+  // Status-bar workspace selector. Picking sets the default for new "+"
+  // tabs AND applies the env immediately so the file tree / AI follow
+  // along. Open terminal tabs keep running in their own env.
+  const switchWorkspace = useCallback(
+    async (env: WorkspaceEnv) => {
+      const normalized = env.kind === "local" ? LOCAL_WORKSPACE : env;
+      setDefaultWorkspaceEnv(normalized);
+      await applyAmbientEnv(normalized);
+    },
+    [setDefaultWorkspaceEnv, applyAmbientEnv],
+  );
+
+  // Auto-follow the focused terminal tab's workspace. Deps intentionally
+  // exclude the store's `env` so a selector pick doesn't immediately get
+  // overridden by this effect — sync only re-runs when the *focused tab*
+  // changes (which is the only legitimate trigger for "switch ambient to
+  // match what the user is looking at").
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const tab = activeTerminalTab;
+    if (!tab) return;
+    void applyAmbientEnv(tab.workspace ?? LOCAL_WORKSPACE);
+  }, [activeTerminalTab]);
 
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [newEditorOpen, setNewEditorOpen] = useState(false);
@@ -296,10 +309,12 @@ export default function App() {
     }
   }, [tabs]);
 
+  const ambientWorkspaceEnv = useWorkspaceEnvStore((s) => s.env);
   const { explorerRoot, inheritedCwdForNewTab } = useWorkspaceCwd(
     activeTab,
     tabs,
     home,
+    ambientWorkspaceEnv,
   );
 
   useEffect(() => {
