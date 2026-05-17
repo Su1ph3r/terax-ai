@@ -21,6 +21,12 @@ type Props = {
   home: string | null;
   onCd: (path: string) => void;
   onWorkspaceChange: (env: WorkspaceEnv) => void;
+  /**
+   * Workspace of the currently focused terminal tab — used by the
+   * selector label so the user sees what the focused terminal is
+   * actually running in (distinct from the AI/explorer ambient env).
+   */
+  activeTerminalWorkspace?: WorkspaceEnv;
   onOpenMini: () => void;
   /** Only rendered when the AI panel is open and a key is loaded. */
   hasComposer: boolean;
@@ -33,6 +39,7 @@ export function StatusBar({
   home,
   onCd,
   onWorkspaceChange,
+  activeTerminalWorkspace,
   onOpenMini,
   hasComposer,
   privateActive,
@@ -43,7 +50,10 @@ export function StatusBar({
   return (
     <footer className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 bg-card/60 px-3 text-[11px]">
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        <WorkspaceEnvSelector onSelect={onWorkspaceChange} />
+        <WorkspaceEnvSelector
+          onSelect={onWorkspaceChange}
+          activeTerminalWorkspace={activeTerminalWorkspace}
+        />
         <CwdBreadcrumb cwd={cwd} filePath={filePath} home={home} onCd={onCd} />
         {privateActive ? (
           <Tooltip>
