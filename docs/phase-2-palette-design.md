@@ -16,7 +16,9 @@ Action and Workflow are distinct concepts:
 - An **action** is the canonical executable thing (one in-memory entry in the registry).
 - A **workflow** is *data* that gets compiled into actions at registration time. Every workflow produces one `workflow.run:<id>` action.
 
-## 2. Action registry
+## 2. Action composition (implementation note)
+
+> **Revision after Phase 2.1 shipped.** The original design called for a Zustand action registry that components register/unregister actions through. Two attempts at that pattern hit infinite-render loops driven by Zustand selectors returning fresh references on every read. We dropped the registry and replaced it with plain React data flow: a hook composes the action list (`useAppActions`) and the palette receives it as a prop. Phase 2.3 / 2.4 fold in workflows and quick actions by extending the hook, not by writing to a global store. The action / category types below still describe the shape; ignore the "registry" terminology in the rest of the doc.
 
 ```ts
 // src/modules/palette/registry.ts
