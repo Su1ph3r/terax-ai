@@ -145,6 +145,7 @@ pub fn run() {
             workspace::wsl_home,
             workspace::workspace_authorize,
             workspace::workspace_current_dir,
+            workspace::workspace_set_active_env,
             startup::get_startup_path,
             open_settings_window,
             secrets::secrets_get,

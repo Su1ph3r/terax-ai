@@ -44,8 +44,15 @@ export const useWorkspaceEnvStore = create<State>((set) => ({
   loading: false,
   error: null,
   // Ambient setter — no persistence. Called by App.tsx whenever the active
-  // tab changes so AI / fs / explorer read the right env.
-  setEnv: (env) => set({ env }),
+  // tab changes so AI / fs / explorer read the right env. Mirror the change
+  // into the Rust side so the git module can route through wsl.exe when
+  // the workspace is WSL (#333).
+  setEnv: (env) => {
+    set({ env });
+    void invoke("workspace_set_active_env", { workspace: env }).catch(() => {
+      // Non-fatal: backend may be transiently busy; next setEnv will retry.
+    });
+  },
   // User-chosen default for new tabs. Persisted across launches.
   setDefaultEnv: (env) => {
     set({ defaultEnv: env });

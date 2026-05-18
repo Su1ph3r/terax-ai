@@ -311,9 +311,15 @@ export function useSourceControl(
         }));
       } catch (error) {
         if (requestId !== requestIdRef.current) return;
+        // Clear repo/hasRepo too — otherwise a workspace switch that lands
+        // on a path the backend can't resolve (e.g. flipping Local → WSL
+        // while git is still misrouted, or switching to a folder that
+        // isn't a repo) leaves Git Graph pinned to the previous repo (#333).
         setState((current) => ({
           ...current,
+          repo: null,
           status: null,
+          hasRepo: false,
           isLoading: false,
           localError: normalizeError(error),
         }));
@@ -405,7 +411,17 @@ export function useSourceControl(
       });
       return;
     }
-    setState((current) => ({ ...current, lastRemoteError: null }));
+    // Drop the previous repo immediately on contextPath transitions. The
+    // refresh below will repopulate it if the new path resolves; if it
+    // doesn't, Git Graph/source-control reflect the empty state instead
+    // of pinning to the previous workspace's repo (#333).
+    setState((current) => ({
+      ...current,
+      repo: null,
+      status: null,
+      hasRepo: false,
+      lastRemoteError: null,
+    }));
     const run = () => {
       void refresh({ remote: "never" });
     };

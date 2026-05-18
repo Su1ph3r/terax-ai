@@ -201,17 +201,47 @@ where
     run_git_uncached(cwd, args, timeout_secs)
 }
 
+// Picks `wsl.exe -d <distro> --cd <cwd> -- git <args>` over native git when
+// the active workspace env is WSL on Windows (#333). Native Windows git
+// cannot operate on POSIX paths like `/home/user/proj`; running git inside
+// WSL sidesteps both the path issue and the `\\wsl.localhost\` "dubious
+// ownership" check that hits when forcing the UNC form.
+fn build_git_command<I, S>(cwd: Option<&Path>, args: I) -> Command
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    #[cfg(windows)]
+    {
+        if let crate::modules::workspace::WorkspaceEnv::Wsl { distro } =
+            crate::modules::workspace::active_env()
+        {
+            let mut cmd = Command::new("wsl.exe");
+            cmd.arg("-d").arg(&distro);
+            if let Some(dir) = cwd {
+                cmd.arg("--cd").arg(dir);
+            }
+            cmd.arg("--").arg("git");
+            cmd.args(args);
+            return cmd;
+        }
+    }
+
+    let mut cmd = Command::new("git");
+    cmd.args(args);
+    if let Some(dir) = cwd {
+        cmd.current_dir(dir);
+    }
+    cmd
+}
+
 fn run_git_uncached<I, S>(cwd: Option<&Path>, args: I, timeout_secs: u64) -> Result<GitOutput>
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
     let dur = Duration::from_secs(timeout_secs.clamp(1, MAX_TIMEOUT_SECS));
-    let mut cmd = Command::new("git");
-    cmd.args(args);
-    if let Some(dir) = cwd {
-        cmd.current_dir(dir);
-    }
+    let mut cmd = build_git_command(cwd, args);
     cmd.env("GIT_TERMINAL_PROMPT", "0")
         .env("GIT_ASKPASS", "")
         .env("SSH_ASKPASS", "")

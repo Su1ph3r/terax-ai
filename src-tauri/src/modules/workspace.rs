@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
 
@@ -70,6 +70,36 @@ impl WorkspaceEnv {
     pub fn is_wsl(&self) -> bool {
         matches!(self, Self::Wsl { .. })
     }
+}
+
+// Globally active workspace env. The frontend has a single ambient
+// `useWorkspaceEnvStore` value (Local or WSL: <distro>) that gates whether
+// the file tree, source control, etc. operate on Windows paths or POSIX
+// WSL paths. Mirror that into Rust so subsystems that can't easily plumb
+// the env through their signatures (e.g. modules::git::process) can route
+// through wsl.exe when appropriate — see #333.
+static ACTIVE_ENV: OnceLock<Mutex<WorkspaceEnv>> = OnceLock::new();
+
+fn active_env_cell() -> &'static Mutex<WorkspaceEnv> {
+    ACTIVE_ENV.get_or_init(|| Mutex::new(WorkspaceEnv::Local))
+}
+
+pub fn active_env() -> WorkspaceEnv {
+    active_env_cell()
+        .lock()
+        .expect("active env poisoned")
+        .clone()
+}
+
+fn set_active_env_inner(env: WorkspaceEnv) {
+    let mut guard = active_env_cell().lock().expect("active env poisoned");
+    *guard = env;
+}
+
+#[tauri::command]
+pub async fn workspace_set_active_env(workspace: WorkspaceEnv) -> Result<(), String> {
+    set_active_env_inner(workspace);
+    Ok(())
 }
 
 #[derive(Clone, Debug, Serialize)]
