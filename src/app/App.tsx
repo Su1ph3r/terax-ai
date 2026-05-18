@@ -69,6 +69,7 @@ import {
   useWorkspaceEnvStore,
   type WorkspaceEnv,
 } from "@/modules/workspace";
+import { invoke } from "@tauri-apps/api/core";
 import { homeDir } from "@tauri-apps/api/path";
 import type { SearchAddon } from "@xterm/addon-search";
 import { AnimatePresence, motion } from "motion/react";
@@ -160,10 +161,22 @@ export default function App() {
     null,
   );
   useEffect(() => {
-    // Forward-slash form so explorerRoot stays equal across home → OSC 7.
-    homeDir()
-      .then((p) => setHome(p.replace(/\\/g, "/")))
-      .catch(() => setHome(null));
+    // If the user launched with `-path` / `--path` / positional CLI arg,
+    // bias the initial explorer root to that directory (#280). Falls
+    // through to homeDir() either when no arg was passed or when the
+    // backend rejected the path as non-existent. Forward-slash form so
+    // explorerRoot stays equal across home → OSC 7.
+    invoke<string | null>("get_startup_path")
+      .catch(() => null)
+      .then((startup) => {
+        if (startup) {
+          setHome(startup);
+          return;
+        }
+        homeDir()
+          .then((p) => setHome(p.replace(/\\/g, "/")))
+          .catch(() => setHome(null));
+      });
   }, []);
 
   // Apply a workspace env to the world (store + explorer home). Used by

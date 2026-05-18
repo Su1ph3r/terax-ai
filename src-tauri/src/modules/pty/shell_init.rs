@@ -104,14 +104,16 @@ fn apply_common(cmd: &mut CommandBuilder, cwd: Option<String>) {
     cmd.env("TERAX_TERMINAL", "1");
     ensure_utf8_locale(cmd);
 
-    // Resolution order (see LAUNCH_CWD doc for context):
+    // Resolution order:
     //   1. explicit cwd from the frontend (active workspace, OSC 7, etc.)
-    //   2. captured launch cwd, so `terax ~/proj` opens new terminals there
-    //   3. $HOME as the safe fallback for GUI / .app-bundle launches
-    //   4. live current_dir as a last resort
+    //   2. CLI startup path from `-path` / `--path` / positional arg (#280)
+    //   3. captured launch cwd, so `terax ~/proj` opens new terminals there (#168)
+    //   4. $HOME as the safe fallback for GUI / .app-bundle launches
+    //   5. live current_dir as a last resort
     let resolved_cwd = cwd
         .map(PathBuf::from)
         .filter(|p| p.is_dir())
+        .or_else(|| crate::modules::startup::startup_path().filter(|p| p.is_dir()))
         .or_else(|| launch_cwd().filter(|p| p.is_dir()))
         .or_else(|| dirs::home_dir().filter(|p| p.is_dir()))
         .or_else(|| std::env::current_dir().ok());

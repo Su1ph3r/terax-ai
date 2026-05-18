@@ -1,6 +1,6 @@
 mod modules;
 
-use modules::{fs, net, pty, secrets, shell, workspace};
+use modules::{fs, net, pty, secrets, shell, startup, workspace};
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_window_state::StateFlags;
 
@@ -64,6 +64,9 @@ pub fn run() {
     // Snapshot the launch cwd before anything has a chance to chdir away —
     // see #168 and modules::pty::shell_init::LAUNCH_CWD.
     pty::shell_init::init_launch_cwd();
+    // Parse `-path` / `--path` / positional CLI args before the webview
+    // touches them — see #280 and modules::startup::STARTUP_PATH.
+    startup::init_startup_path();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
@@ -118,6 +121,7 @@ pub fn run() {
             workspace::wsl_list_distros,
             workspace::wsl_default_distro,
             workspace::wsl_home,
+            startup::get_startup_path,
             open_settings_window,
             secrets::secrets_get,
             secrets::secrets_set,
