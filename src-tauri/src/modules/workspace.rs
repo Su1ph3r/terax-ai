@@ -102,6 +102,42 @@ pub async fn workspace_set_active_env(workspace: WorkspaceEnv) -> Result<(), Str
     Ok(())
 }
 
+// User-configured persistent home directory override (#190). The setting
+// lives in terax-settings.json; the frontend mirrors changes here so the
+// PTY resolution chain in modules::pty::shell_init can pick it up. None
+// means "no override, use OS home_dir() as usual."
+static CUSTOM_HOME_PATH: OnceLock<Mutex<Option<PathBuf>>> = OnceLock::new();
+
+fn custom_home_cell() -> &'static Mutex<Option<PathBuf>> {
+    CUSTOM_HOME_PATH.get_or_init(|| Mutex::new(None))
+}
+
+pub fn custom_home_path() -> Option<PathBuf> {
+    custom_home_cell()
+        .lock()
+        .expect("custom home poisoned")
+        .clone()
+}
+
+#[tauri::command]
+pub async fn workspace_set_custom_home(path: Option<String>) -> Result<(), String> {
+    let next = match path {
+        Some(s) if !s.is_empty() => {
+            let p = PathBuf::from(&s);
+            if !p.is_dir() {
+                return Err(format!("not a directory: {s}"));
+            }
+            Some(p)
+        }
+        _ => None,
+    };
+    let mut guard = custom_home_cell()
+        .lock()
+        .expect("custom home poisoned");
+    *guard = next;
+    Ok(())
+}
+
 #[derive(Clone, Debug, Serialize)]
 pub struct WslDistro {
     pub name: String,

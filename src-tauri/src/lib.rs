@@ -146,6 +146,7 @@ pub fn run() {
             workspace::workspace_authorize,
             workspace::workspace_current_dir,
             workspace::workspace_set_active_env,
+            workspace::workspace_set_custom_home,
             startup::get_startup_path,
             open_settings_window,
             secrets::secrets_get,

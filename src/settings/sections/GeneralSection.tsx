@@ -5,7 +5,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { IS_WINDOWS } from "@/lib/platform";
 import {
   Tooltip,
   TooltipContent,
@@ -21,6 +23,7 @@ import {
   TERMINAL_FONT_SIZES,
   TERMINAL_SCROLLBACK_PRESETS,
   setAutostart,
+  setCustomHomePath,
   setEditorTheme,
   setRestoreWindowState,
   setShowHidden,
@@ -65,6 +68,7 @@ export function GeneralSection() {
   );
   const terminalFontSize = usePreferencesStore((s) => s.terminalFontSize);
   const terminalScrollback = usePreferencesStore((s) => s.terminalScrollback);
+  const customHomePath = usePreferencesStore((s) => s.customHomePath);
 
   // Reconcile autostart pref with the actual OS state on mount — the user may
   // have toggled it from System Settings.
@@ -319,6 +323,21 @@ export function GeneralSection() {
               onCheckedChange={(v) => void setRestoreWindowState(v)}
             />
           </SettingRow>
+          {IS_WINDOWS && (
+            <SettingRow
+              title="Custom home directory"
+              description="Override the default home for new terminals and the explorer (e.g. D:\\Workspace). Leave empty to use the OS home."
+            >
+              <Input
+                type="text"
+                value={customHomePath ?? ""}
+                onChange={(e) => void setCustomHomePath(e.target.value || null)}
+                placeholder="D:\\Workspace"
+                className="h-8 w-64 rounded-none text-[12px]"
+                spellCheck={false}
+              />
+            </SettingRow>
+          )}
         </div>
       </div>
     </div>

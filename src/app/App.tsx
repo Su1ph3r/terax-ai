@@ -287,11 +287,11 @@ export default function App() {
     null,
   );
   useEffect(() => {
-    // If the user launched with `-path` / `--path` / positional CLI arg,
-    // bias the initial explorer root to that directory (#280). Falls
-    // through to homeDir() either when no arg was passed or when the
-    // backend rejected the path as non-existent. Forward-slash form so
-    // explorerRoot stays equal across home → OSC 7.
+    // Initial explorer root resolution. Precedence:
+    //   1. `-path` / `--path` / positional CLI arg (#280)
+    //   2. user-configured custom home (#190)
+    //   3. OS `homeDir()`
+    // Forward-slash form so explorerRoot stays equal across home → OSC 7.
     const apply = async (raw: string) => {
       setHome(raw);
       try {
@@ -307,11 +307,29 @@ export default function App() {
           void apply(startup);
           return;
         }
+        const custom = usePreferencesStore.getState().customHomePath;
+        if (custom && custom.trim() !== "") {
+          void apply(custom.replace(/\\/g, "/"));
+          return;
+        }
         homeDir()
           .then((p) => void apply(p.replace(/\\/g, "/")))
           .catch(() => setHome(null));
       });
   }, []);
+
+  // Mirror the custom-home preference into the Rust side so the PTY
+  // resolution chain (#190) and the explorer agree on first paint.
+  const customHomePath = usePreferencesStore((s) => s.customHomePath);
+  useEffect(() => {
+    void invoke("workspace_set_custom_home", {
+      path: customHomePath && customHomePath.trim() !== "" ? customHomePath : null,
+    }).catch(() => {
+      // Non-fatal: backend may reject if the dir was removed since the
+      // preference was saved. The setting still persists; the user can
+      // fix it from Settings.
+    });
+  }, [customHomePath]);
 
   // Apply a workspace env to the world (store + explorer home). Used by
   // both the selector pick path and the focus-change auto-sync below so

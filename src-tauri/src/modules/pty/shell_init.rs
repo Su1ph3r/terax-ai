@@ -108,13 +108,15 @@ fn apply_common(cmd: &mut CommandBuilder, cwd: Option<String>) {
     //   1. explicit cwd from the frontend (active workspace, OSC 7, etc.)
     //   2. CLI startup path from `-path` / `--path` / positional arg (#280)
     //   3. captured launch cwd, so `terax ~/proj` opens new terminals there (#168)
-    //   4. $HOME as the safe fallback for GUI / .app-bundle launches
-    //   5. live current_dir as a last resort
+    //   4. user-configured custom home path (#190)
+    //   5. $HOME as the safe fallback for GUI / .app-bundle launches
+    //   6. live current_dir as a last resort
     let resolved_cwd = cwd
         .map(PathBuf::from)
         .filter(|p| p.is_dir())
         .or_else(|| crate::modules::startup::startup_path().filter(|p| p.is_dir()))
         .or_else(|| launch_cwd().filter(|p| p.is_dir()))
+        .or_else(|| crate::modules::workspace::custom_home_path().filter(|p| p.is_dir()))
         .or_else(|| dirs::home_dir().filter(|p| p.is_dir()))
         .or_else(|| std::env::current_dir().ok());
     if let Some(cwd) = resolved_cwd {
