@@ -15,6 +15,13 @@ export const vimCompartment = new Compartment();
 // basicSetup gives us line numbers, fold gutter, history, indentOnInput,
 // bracketMatching, closeBrackets, autocompletion, highlightActiveLine,
 // highlightSelectionMatches and the search keymap.
+//
+// Color choices (background, foreground, caret, selection, gutter, active
+// line) intentionally live on the editor theme extension — see EDITOR_THEMES
+// in modules/settings/store and the @uiw/codemirror-theme-* packages. Putting
+// color overrides here would silently win over the user-picked theme because
+// react-codemirror concatenates user extensions after the `theme` prop, and
+// the last extension wins on CSS rules with the same selector (#32).
 export function buildSharedExtensions(): Extension[] {
   return [
     indentUnit.of("  "),
@@ -23,8 +30,6 @@ export function buildSharedExtensions(): Extension[] {
     lintGutter(),
     EditorView.theme({
       "&, &.cm-editor, &.cm-editor.cm-focused": {
-        backgroundColor: "transparent !important",
-        color: "var(--foreground)",
         outline: "none",
         padding: "8px",
       },
@@ -32,43 +37,17 @@ export function buildSharedExtensions(): Extension[] {
         fontFamily: detectMonoFontFamily(),
         fontSize: "13px",
         lineHeight: "1.55",
-        backgroundColor: "transparent !important",
-      },
-      ".cm-content": {
-        caretColor: "var(--foreground)",
-        backgroundColor: "transparent !important",
-      },
-      ".cm-gutters": {
-        backgroundColor: "transparent !important",
-        color: "var(--muted-foreground)",
       },
       ".cm-gutter-lint": {
         width: "0px",
       },
-      ".cm-gutter": { backgroundColor: "transparent !important" },
-      ".cm-lineNumbers .cm-gutterElement": {
-        opacity: "0.55",
-      },
       ".cm-foldGutter": { width: "10px" },
-      ".cm-foldGutter .cm-gutterElement": {
-        color: "var(--muted-foreground)",
-        opacity: "0.5",
-      },
-      ".cm-activeLine": {
-        borderTopRightRadius: "5px",
-        borderBottomRightRadius: "5px",
-        backgroundColor:
-          "color-mix(in srgb, var(--foreground) 4%, transparent)",
-      },
       ".cm-lineNumbers .cm-activeLineGutter": {
-        borderTopLeftRadius: "5px",
-        borderBottomLeftRadius: "5px",
         userSelect: "none",
       },
-      ".cm-cursor, .cm-dropCursor": {
-        borderLeftColor: "var(--foreground)",
-      },
       // Vim normal-mode block cursor — translucent foreground, no rose hue.
+      // Keyed to app color tokens because Vim mode is an app-level feature,
+      // not a per-theme one.
       ".cm-fat-cursor": {
         background:
           "color-mix(in srgb, var(--foreground) 35%, transparent) !important",
@@ -81,11 +60,8 @@ export function buildSharedExtensions(): Extension[] {
         outline:
           "1px solid color-mix(in srgb, var(--foreground) 35%, transparent) !important",
       },
-      ".cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection":
-        {
-          backgroundColor:
-            "color-mix(in srgb, var(--foreground) 18%, transparent) !important",
-        },
+      // Search panel is an app UI surface — keep it matched to the app
+      // chrome regardless of the editor theme.
       ".cm-panels": {
         backgroundColor: "var(--popover)",
         color: "var(--popover-foreground)",
