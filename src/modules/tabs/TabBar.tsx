@@ -17,6 +17,7 @@ import {
 } from "@/modules/workspace";
 import {
   Cancel01Icon,
+  Clock01Icon,
   ComputerTerminal02Icon,
   GitCompareIcon,
   Globe02Icon,
@@ -294,6 +295,26 @@ function TabIcon({ tab }: { tab: Tab }) {
       />
     );
   }
+  if (tab.kind === "git-diff" || tab.kind === "git-commit-file") {
+    return (
+      <HugeiconsIcon
+        icon={GitCompareIcon}
+        size={14}
+        strokeWidth={2}
+        className="shrink-0 text-emerald-600 dark:text-emerald-400"
+      />
+    );
+  }
+  if (tab.kind === "git-history") {
+    return (
+      <HugeiconsIcon
+        icon={Clock01Icon}
+        size={14}
+        strokeWidth={2}
+        className="shrink-0 text-sky-600 dark:text-sky-400"
+      />
+    );
+  }
   return (
     <HugeiconsIcon
       icon={ComputerTerminal02Icon}
@@ -308,6 +329,9 @@ function labelFor(t: Tab): string {
   if (t.kind === "editor") return t.title;
   if (t.kind === "preview") return t.title;
   if (t.kind === "ai-diff") return t.title;
+  if (t.kind === "git-diff") return t.title;
+  if (t.kind === "git-history") return t.title;
+  if (t.kind === "git-commit-file") return t.title;
   if (!t.cwd) return t.title;
   const parts = t.cwd.split(/[\\/]/).filter(Boolean);
   return parts.length ? parts[parts.length - 1] : "/";
