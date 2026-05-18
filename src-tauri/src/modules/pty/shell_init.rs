@@ -1,8 +1,59 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 use portable_pty::CommandBuilder;
 
 use crate::modules::workspace::WorkspaceEnv;
+
+// Directory Terax was launched from, captured exactly once at startup.
+//
+// `apply_common` used to fall back to live `std::env::current_dir()`, which
+// works in `tauri dev` (the dev runner cd's into the repo before exec) but
+// is fragile in the long run: the process cwd can drift later in a session
+// (file dialogs, plugin code, IPC handlers), and on macOS a Finder/dock
+// launch leaves cwd inside the `.app` bundle, which is a hostile place to
+// drop the user.
+//
+// We snapshot the launch cwd once here, filter out obviously useless values
+// (filesystem roots, macOS app bundle paths), and put the captured value
+// ahead of `home_dir()` in the resolution chain. See #168.
+static LAUNCH_CWD: OnceLock<Option<PathBuf>> = OnceLock::new();
+
+/// Capture the process cwd at app startup. Idempotent.
+pub fn init_launch_cwd() {
+    LAUNCH_CWD.set(detect_launch_cwd()).ok();
+}
+
+fn detect_launch_cwd() -> Option<PathBuf> {
+    let cwd = std::env::current_dir().ok()?;
+    if is_uninteresting_launch_cwd(&cwd) {
+        return None;
+    }
+    Some(cwd)
+}
+
+// "Uninteresting" launch cwds are places we'd rather fall through to $HOME
+// than open a terminal in. Kept narrow — over-filtering steals legitimate
+// launch directories.
+fn is_uninteresting_launch_cwd(p: &Path) -> bool {
+    // Filesystem roots: `/` on unix, drive root like `C:\` on Windows.
+    if p.parent().is_none() {
+        return true;
+    }
+    // macOS .app bundle launch (Finder/dock): cwd is something like
+    // `/Applications/Terax.app/Contents/MacOS`.
+    if cfg!(target_os = "macos") {
+        let s = p.to_string_lossy();
+        if s.contains(".app/Contents/MacOS") {
+            return true;
+        }
+    }
+    false
+}
+
+fn launch_cwd() -> Option<PathBuf> {
+    LAUNCH_CWD.get().and_then(|o| o.clone())
+}
 
 #[cfg(windows)]
 const BASHRC_SCRIPT: &str = include_str!("scripts/bashrc.bash");
@@ -53,13 +104,17 @@ fn apply_common(cmd: &mut CommandBuilder, cwd: Option<String>) {
     cmd.env("TERAX_TERMINAL", "1");
     ensure_utf8_locale(cmd);
 
+    // Resolution order (see LAUNCH_CWD doc for context):
+    //   1. explicit cwd from the frontend (active workspace, OSC 7, etc.)
+    //   2. captured launch cwd, so `terax ~/proj` opens new terminals there
+    //   3. $HOME as the safe fallback for GUI / .app-bundle launches
+    //   4. live current_dir as a last resort
     let resolved_cwd = cwd
         .map(PathBuf::from)
         .filter(|p| p.is_dir())
-        // In `tauri dev`, inherit the repo cwd so explorer/source-control
-        // point at the project the user launched from instead of `$HOME`.
-        .or_else(|| std::env::current_dir().ok().filter(|p| p.is_dir()))
-        .or_else(|| dirs::home_dir().filter(|p| p.is_dir()));
+        .or_else(|| launch_cwd().filter(|p| p.is_dir()))
+        .or_else(|| dirs::home_dir().filter(|p| p.is_dir()))
+        .or_else(|| std::env::current_dir().ok());
     if let Some(cwd) = resolved_cwd {
         #[cfg(windows)]
         let cwd = PathBuf::from(cwd.to_string_lossy().replace('/', "\\"));
@@ -401,4 +456,53 @@ fn which_in_path(name: &str) -> Option<PathBuf> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_uninteresting_launch_cwd;
+    use std::path::Path;
+
+    #[test]
+    fn filesystem_root_is_uninteresting() {
+        #[cfg(unix)]
+        assert!(is_uninteresting_launch_cwd(Path::new("/")));
+        #[cfg(windows)]
+        assert!(is_uninteresting_launch_cwd(Path::new(r"C:\")));
+    }
+
+    #[test]
+    fn normal_directories_are_interesting() {
+        #[cfg(unix)]
+        {
+            assert!(!is_uninteresting_launch_cwd(Path::new("/home/user")));
+            assert!(!is_uninteresting_launch_cwd(Path::new(
+                "/home/user/projects/foo"
+            )));
+            assert!(!is_uninteresting_launch_cwd(Path::new("/tmp")));
+        }
+        #[cfg(windows)]
+        {
+            assert!(!is_uninteresting_launch_cwd(Path::new(r"C:\Users\user")));
+            assert!(!is_uninteresting_launch_cwd(Path::new(
+                r"C:\Users\user\projects\foo"
+            )));
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_app_bundle_is_uninteresting() {
+        assert!(is_uninteresting_launch_cwd(Path::new(
+            "/Applications/Terax.app/Contents/MacOS"
+        )));
+        assert!(is_uninteresting_launch_cwd(Path::new(
+            "/Users/me/Applications/Terax.app/Contents/MacOS"
+        )));
+        // A path that mentions .app but isn't the MacOS bundle dir
+        // should still be considered interesting.
+        assert!(!is_uninteresting_launch_cwd(Path::new(
+            "/Users/me/projects/my.app"
+        )));
+    }
 }
