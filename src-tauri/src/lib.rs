@@ -61,6 +61,10 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Snapshot the launch cwd before anything has a chance to chdir away —
+    // see #168 and modules::pty::shell_init::LAUNCH_CWD.
+    pty::shell_init::init_launch_cwd();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
