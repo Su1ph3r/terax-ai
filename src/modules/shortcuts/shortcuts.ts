@@ -28,7 +28,8 @@ export type ShortcutId =
   | "ai.askSelection"
   | "shortcuts.open"
   | "settings.open"
-  | "sidebar.toggle";
+  | "sidebar.toggle"
+  | "palette.open";
 
 export type ShortcutGroup =
   | "General"
@@ -55,6 +56,21 @@ export type Shortcut = {
 };
 
 export const SHORTCUTS: Shortcut[] = [
+  {
+    id: "palette.open",
+    label: "Open command palette",
+    group: "General",
+    // Cmd/Ctrl+Shift+P is the VSCode-standard binding; F1 is a fallback
+    // because WebView2 on Windows reserves Ctrl+Shift+P for InPrivate
+    // browsing and swallows it before our keydown handler can fire.
+    // (Disabling WebView2's browser accelerators isn't currently exposed
+    // through tauri.conf — leaving F1 as the working binding on Windows
+    // until we add native WebView2 settings overrides.)
+    defaultBindings: [
+      { [MOD_PROP]: true, shift: true, key: "p" },
+      { key: "F1" },
+    ],
+  },
   {
     id: "settings.open",
     label: "Open settings",

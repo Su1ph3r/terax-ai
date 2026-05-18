@@ -46,6 +46,7 @@ import {
   type SearchTarget,
 } from "@/modules/header";
 import { PreviewStack, type PreviewPaneHandle } from "@/modules/preview";
+import { CommandPalette, useAppActions } from "@/modules/palette";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { onKeysChanged } from "@/modules/settings/store";
@@ -401,6 +402,7 @@ export default function App() {
   }, [activeTerminalTab]);
 
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [newEditorOpen, setNewEditorOpen] = useState(false);
   const miniOpen = useChatStore((s) => s.mini.open);
   const openMini = useChatStore((s) => s.openMini);
@@ -949,6 +951,7 @@ export default function App() {
       "ai.toggle": togglePanelAndFocus,
       "ai.askSelection": askFromSelection,
       "shortcuts.open": () => setShortcutsOpen((v) => !v),
+      "palette.open": () => setPaletteOpen((v) => !v),
       "settings.open": () => void openSettingsWindow(),
       "sidebar.toggle": toggleSidebar,
       "explorer.focus": toggleExplorerFocus,
@@ -978,6 +981,7 @@ export default function App() {
   );
 
   useGlobalShortcuts(shortcutHandlers);
+  const paletteActions = useAppActions(shortcutHandlers);
 
   const registerTerminalHandle = useCallback(
     (leafId: number, h: TerminalPaneHandle | null) => {
@@ -1266,7 +1270,7 @@ export default function App() {
                     activeView={sidebarView}
                     onSelectView={persistSidebarView}
                     changedCount={sourceControl.changedCount}
-                    onOpenCommandPalette={() => setShortcutsOpen(true)}
+                    onOpenCommandPalette={() => setPaletteOpen(true)}
                     onOpenGitGraph={openGitGraphFromContext}
                   />
                 </div>
@@ -1341,6 +1345,12 @@ export default function App() {
           <ShortcutsDialog
             open={shortcutsOpen}
             onOpenChange={setShortcutsOpen}
+          />
+
+          <CommandPalette
+            open={paletteOpen}
+            onOpenChange={setPaletteOpen}
+            actions={paletteActions}
           />
 
           <NewEditorDialog

@@ -47,10 +47,6 @@ function CommandDialog({
 }) {
   return (
     <Dialog {...props}>
-      <DialogHeader className="sr-only">
-        <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>{description}</DialogDescription>
-      </DialogHeader>
       <DialogContent
         className={cn(
           "top-1/3 translate-y-0 overflow-hidden rounded-4xl! p-0",
@@ -58,7 +54,15 @@ function CommandDialog({
         )}
         showCloseButton={showCloseButton}
       >
-        {children}
+        {/* Radix Dialog requires DialogTitle inside DialogContent (a11y).
+            Keep both header elements visually hidden via sr-only. */}
+        <DialogHeader className="sr-only">
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        {/* cmdk's Input/List/Item consume the context provided by the
+            Command root — without this wrapper they throw on mount. */}
+        <Command>{children}</Command>
       </DialogContent>
     </Dialog>
   )
